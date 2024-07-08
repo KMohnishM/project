@@ -1,56 +1,67 @@
+import random
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 
-a = [(8, 2), (12, 3), (15, 10), (23, 14), (28, 1)]  # snakes
-b = [(4, 11), (9, 21), (13, 27), (17, 24), (22, 27)]  # ladders
+app = Flask(__name__)
+CORS(app)  # This will enable CORS for all routes
 
-def broad(current_position):
-    for i in a:
-        if current_position == i[0]:
-            current_position= i[1]
-    for i in b:
-        if current_position == i[0]:
-            current_position= i[1]
-    return current_position
+# Function to generate random snakes and ladders
+def generate_snakes_and_ladders(count):
+    positions = set()
+    while len(positions) < count * 2:
+        start = random.randint(2, 99)  # Generate start position between 2 and 99
+        end = random.randint(1, start - 1)  # Generate end position less than start
+        positions.add((start, end))
+    return list(positions)
 
-def game():
-    player1_position = 0
-    player2_position = 0
-    while True:
-        player1_dice = int(input("Player 1, roll the dice: "))
-        if player1_dice>6 or player1_dice<0 :
-           print('invalid input')
-        if  player1_dice+player1_position <=30:
-         player1_position += player1_dice
-        player1_position = broad(player1_position)
+# Generate 5 random snakes and ladders
+snakes = generate_snakes_and_ladders(12)
+ladders = generate_snakes_and_ladders(9)
 
-        player2_dice = int(input("Player 2, roll the dice: "))
-        if player1_dice>6 or player1_dice<0 :
-           print('invalid input')
-        if  player2_dice+player2_position <=30:
-         player2_position += player2_dice
-        player2_position = broad(player2_position)
+# Initial game state
+game_state = {
+    "players": [
+        {"id": 1, "position": 0},
+        {"id": 2, "position": 0}
+    ],
+    "ladders": ladders,
+    "winner": None  # Add a winner field
+}
 
-        print("Player 1 position:", player1_position)
-        print("Player 2 position:", player2_position)
+def apply_snakes_and_ladders(position):
+    for start, end in snakes:
+        if position == start:
+            return end
+    for start, end in ladders:
+        if position == start:
+            return end
+    return position
 
-        
-        if player1_position == 30:
-            print('Player 1 won the game!')
-            break
-        elif player2_position == 30:
-            print('Player 2 won the game!')
-            break
+@app.route('/')
+def index():
+    return "Snake and Ladder Game API"
 
-game()
+@app.route('/api/game-state', methods=['GET'])
+def get_game_state():
+    return jsonify(game_state)
 
-     
+@app.route('/api/move-player', methods=['POST'])
+def move_player():
+    data = request.get_json()
+    player_id = data['playerId']
+    dice_roll = data['diceRoll']
+    player = next(p for p in game_state["players"] if p["id"] == player_id)
 
+    new_position = player["position"] + dice_roll
+    if new_position <= 100:
+        new_position = apply_snakes_and_ladders(new_position)
+        player["position"] = new_position
 
+    # Check if the player has reached position 100
+    if new_position == 100:
+        game_state["winner"] = player_id
 
+    return jsonify(game_state)
 
-
-# 30 29 28 27 26
-# 21 22 23 24 25
-# 20 19 18 17 16 
-# 11 12 13 14 15
-# 10 9 8 7 6
-# 1 2 3 4 5 
+if __name__ == '__main__':
+    app.run(debug=True)
